@@ -5,13 +5,18 @@
 # Modified by Evan Simkowitz (esimkowitz@wustl.edu), July 2017
 
 import argparse
-from flask import Flask, render_template, session, request
+from camera_pi import Camera
+from flask import Flask, render_template, session, request, Response
 from flask_socketio import SocketIO, emit, join_room, leave_room, \
     close_room, rooms, disconnect
+
 # Import the Robot.py file (must be in the same directory as this file!).
 try:
     import Robot
+    is_robot = True
 except ImportError:
+    print("No robot available")
+    is_robot = False
     pass
 
 # Set the trim offset for each motor (left and right).  This is a value that
@@ -37,7 +42,10 @@ RIGHT_TRIM = 0
 try:
     robot = Robot.Robot(left_trim=LEFT_TRIM, right_trim=RIGHT_TRIM)
 except:
-    pass
+    if is_robot:
+        raise RuntimeError("Unknown error with robot")
+    else:
+        pass
 
 # Set this variable to "threading", "eventlet" or "gevent" to test the
 # different async modes, or leave it set to None for the application to choose
@@ -55,12 +63,14 @@ async_mode = None
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
 socketio = SocketIO(app, async_mode=async_mode)
-thread = None
 
 
-def background_thread():
-    # Do nothing
-    count = 0
+def gen(camera):
+    """Video streaming generator function."""
+    while True:
+        frame = camera.get_frame()
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
 
 
 @app.route('/')
@@ -78,32 +88,54 @@ def test_message(message):
         try:
             robot.forward(75)
         except:
-            pass
+            if is_robot:
+                raise RuntimeError("Unknown error with robot")
+            else:
+                pass
         print("robot forward")
     elif message['data'] == 'Backward':
         try:
             robot.backward(75)
         except:
-            pass
+            if is_robot:
+                raise RuntimeError("Unknown error with robot")
+            else:
+                pass
         print("robot backward")
     elif message['data'] == 'Left':
         try:
             robot.left(75)
         except:
-            pass
+            if is_robot:
+                raise RuntimeError("Unknown error with robot")
+            else:
+                pass
         print("robot left")
     elif message['data'] == 'Right':
         try:
             robot.right(75)
         except:
-            pass
+            if is_robot:
+                raise RuntimeError("Unknown error with robot")
+            else:
+                pass
         print("robot right")
     elif message['data'] == 'Stop':
         try:
             robot.stop()
         except:
-            pass
+            if is_robot:
+                raise RuntimeError("Unknown error with robot")
+            else:
+                pass
         print("robot stopped")
+
+
+@app.route('/video_feed')
+def video_feed():
+    """Video streaming route. Put this in the src attribute of an img tag."""
+    return Response(gen(Camera()),
+                    mimetype='multipart/x-mixed-replace; boundary=frame')
 
 
 @socketio.on('join', namespace='/test')
@@ -134,10 +166,7 @@ def disconnect_request():
 
 @socketio.on('connect', namespace='/test')
 def test_connect():
-    global thread
-    if thread is None:
-        thread = socketio.start_background_task(target=background_thread)
-    emit('my_response', {'data': 'Connected', 'count': 0})
+    emit('my_response', {'data': 'Connected'})
 
 
 @socketio.on('disconnect', namespace='/test')
