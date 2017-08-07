@@ -26,7 +26,9 @@ setup(name='RobotControl',
           'Topic :: System :: Hardware'],
       url='https://github.com/esimkowitz/RobotControl/',
       dependency_links=[
-          'https://github.com/adafruit/Adafruit-Motor-HAT-Python-Library/tarball/master'],
-      install_requires=['Flask>=0.12.2', 'Flask-SocketIO>=2.9.1'],
+          'https://github.com/adafruit/Adafruit-Motor-HAT-Python-Library/tarball/master',
+          'https://github.com/adafruit/Adafruit_Python_GPIO/tarball/master#egg=Adafruit-GPIO-0.7'],
+      install_requires=['Flask>=0.12.2',
+                        'Flask-SocketIO>=2.9.1', 'Adafruit_MotorHAT>=1.4.0', 'Adafruit-GPIO>=0.7'],
       packages=find_packages(),
       zip_safe=False)
