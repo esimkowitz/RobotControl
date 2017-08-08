@@ -4,79 +4,86 @@
 <head>
     <title>Robot Controls</title>
     <meta charset="utf-8">
-    <meta name="Robot Controls" content="A controller for a Python-based Raspberry Pi robot.">
+    <meta name="description" content="A controller for a Python-based Raspberry Pi robot.">
+    <meta name="author" content="Evan Simkowitz">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/socket.io/1.3.5/socket.io.min.js"></script>
     <script type="text/javascript" src="{{ url_for('static', filename='js/nipplejs.min.js') }}"></script>
     <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/joystick.css') }}">
     <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/style.css') }}">
     <script type="text/javascript" charset="utf-8">
-        // Use a "/test" namespace. 
-        // An application can open a connection on multiple namespaces, and 
-        // Socket.IO will multiplex all those connections on a single 
-        // physical channel. If you don't care about multiple channels, you 
-        // can set the namespace to an empty string.
-        var namespace = '/test';
+        function sendData(data) {
+            var XHR = new XMLHttpRequest();
+            var urlEncodedData = "";
+            var urlEncodedDataPairs = [];
+            var name;
 
-        // Connect to the Socket.IO server.
-        // The connection URL has the following format:
-        // http[s]://<domain>:<port>[/<namespace>]
-        var socket = io.connect(location.protocol + '//' + document.domain + ':' + location.port + namespace);
+            // Turn the data object into an array of URL-encoded key/value pairs.
+            for (name in data) {
+                urlEncodedDataPairs.push(encodeURIComponent(name) + '=' + encodeURIComponent(data[name]));
+            }
 
-        // Event handler for new connections. 
-        // The callback function is invoked when a connection with the 
-        // server is established.
-        socket.on('connect', function () {
-            socket.emit('my_event', {
-                data: 'I\'m connected!'
+            // Combine the pairs into a single string and replace all %-encoded spaces to 
+            // the '+' character; matches the behaviour of browser form submissions.
+            urlEncodedData = urlEncodedDataPairs.join('&').replace(/%20/g, '+');
+
+            // Define what happens on successful data submission
+            XHR.addEventListener('load', function (event) {
+                console.log('Successful response for ' + data);
             });
-            console.log("I\'m connected!");
-        });
 
-        // Event handler for server sent data. 
-        // The callback function is invoked whenever the server emits data
-        // to the client. The data is then displayed in the "Received" 
-        // section of the page. 
-        socket.on('my_response', function (msg) {
-            console.log('Received message: ' + msg.data);
-        });
+            // Define what happens in case of error
+            XHR.addEventListener('error', function (event) {
+                console.log('Unsuccessful response for ' + data);
+            });
+            
+            // Set up our request
+            var url = location.protocol + '//' + document.domain + ':' + location.port + '/control_event';
+
+            XHR.open('POST', url);
+
+            // Add the required HTTP header for form data POST requests
+            XHR.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+
+            // Finally, send our data.
+            XHR.send(urlEncodedData);
+        }
 
         function control(message) {
-            socket.emit('control_event', {
-                data: message
+            sendData({
+                'control': message
             });
-            console.log(message);
+            console.log("Control \'" + message + "\' sent to robot");
         }
 
-        function moveforward() {
-            control("Forward");
+        function forward() {
+            control("f");
         }
 
-        function moveleft() {
-            control("Left");
+        function left() {
+            control("l");
         }
 
-        function moveright() {
-            control("Right");
+        function right() {
+            control("r");
         }
 
-        function movebackward() {
-            control("Backward");
+        function backward() {
+            control("b");
         }
 
         function stop() {
-            control("Stop");
+            control("s");
         }
 
         document.addEventListener("keydown", function (event) {
             if (event.which === 87 || event.which === 38) {
-                moveforward();
+                forward();
             } else if (event.which === 68 || event.which === 39) {
-                moveright();
+                right();
             } else if (event.which === 83 || event.which === 40) {
-                movebackward();
+                backward();
             } else if (event.which === 65 || event.which === 37) {
-                moveleft();
+                left();
             }
         });
 
@@ -95,7 +102,27 @@
     <h1>Robot Controls</h1>
     <div id="control_area">
         <div class="zone joystick active" id="joystick"></div>
-        <img src="{{ url_for('video_feed') }}" id="stream">
+        <canvas id="videoCanvas" width="{{ canvas_size.width }}" height="{{ canvas_size.height }}">
+            <p>
+                Please use a browser that supports the Canvas Element, like
+                <a href="http://www.google.com/chrome">Chrome</a>,
+                <a href="http://www.mozilla.com/firefox/">Firefox</a>,
+                <a href="http://www.apple.com/safari/">Safari</a> or Internet Explorer 10
+            </p>
+        </canvas>
+        <script type="text/javascript" src="{{ url_for('static', filename='js/jsmpg.js') }}"></script>
+        <script type="text/javascript">
+            // Show loading notice
+            var canvas = document.getElementById('videoCanvas');
+            var ctx = canvas.getContext('2d');
+            ctx.fillStyle = '{{ color }}';
+            ctx.fillText('Loading...', canvas.width / 2 - 30, canvas.height / 3);
+            // Setup the WebSocket connection and start the player
+            var client = new WebSocket('ws://{{ address }}/');
+            var player = new jsmpeg(client, {
+                canvas: canvas
+            });
+        </script>
     </div>
 </body>
 <script type="text/javascript" charset="utf-8">
@@ -106,16 +133,16 @@
     });
 
     manager.on("dir:up", function (event) {
-        moveforward();
+        forward();
     });
     manager.on("dir:down", function (event) {
-        movebackward();
+        backward();
     });
     manager.on("dir:left", function (event) {
-        moveleft();
+        left();
     });
     manager.on("dir:right", function (event) {
-        moveright();
+        right();
     });
     manager.on("end", function (event) {
         stop();
