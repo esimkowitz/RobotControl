@@ -10,7 +10,7 @@ Use the following script to download and install RobotControl:
 cd ~
 git clone https://github.com/esimkowitz/RobotControl.git
 cd ~/RobotControl
-python3 setup.py install
+sudo python3 setup.py install
 ```
 
 ## Usage
